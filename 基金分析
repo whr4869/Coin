@@ -1,0 +1,66 @@
+import json, openpyxl       #json处理JSON数据的函数，例如解析JSON字符串和将Python对象编码为JSON格式，openpyxl处理Excel文件
+import re, time             #re正则表达式，time模块提供了各种用于处理时间，测量时间间隔和休眠指定时间               
+import jsonpath             #jsonpath使用类似于XPath的表达式从JSON文档中提取数据
+import requests             #requests允许您在Python中进行HTTP请求
+from threading import Lock  #
+
+
+headers = {
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    # Requests sorts cookies= alphabetically
+    'Cookie': r"qgqp_b_id=f6904b929805bb24b9bcf74c4897cf71; _adsame_fullscreen_14694=1; searchbar_code=161725; _adsame_fullscreen_18503=1; EMFUND1=null; EMFUND2=null; EMFUND3=null; EMFUND4=null; EMFUND5=null; EMFUND6=null; EMFUND7=null; EMFUND8=null; EMFUND0=null; EMFUND9=07-02 20:53:54@#{%u62DB%u5546%u4E2D%u8BC1%u767D%u9152%u6307%u6570%28LOF%29A@%23%24161725;} ASP.NET_SessionId=vh42aa0edk1npugdh20yud4v",
+    'DNT': '1',
+    'Pragma': 'no-cache',
+    'Referer': 'http://fund.eastmoney.com/161725.html?spm=search',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+    'sec-gpc': '1',
+}
+
+params = {
+     '016501':'华夏龙头半导体',
+     '009052':'易方达中证',
+     '016858':'国金量化多因子',
+     '010364':'鹏华中证军工',
+     '004685':'金源顺安源灵活配置'
+}
+
+
+wb = openpyxl.Workbook()
+
+for ID, fund_name in params.items():
+    response = requests.get(f'http://fund.eastmoney.com/pingzhongdata/{ID}.js', headers=headers, verify=False).text
+    data = re.findall('Data_netWorthTrend = (\[.*?\])', response, re.S)[0]
+    js = json.loads(data)
+
+    sheet = wb.create_sheet(title=fund_name)  # 为每个基金创建一个新的工作表
+    header = ['时间', '单位净值', '单日变化', '单日变化百分比', '趋势累计变化']
+    sheet.append(header)
+
+    content = jsonpath.jsonpath(js, '$.*')
+
+    previous_value = None  # 用于存储前一个单位净值的变量
+    cumulative_change = 0  # 用于存储趋势累计变化的变量
+
+    for i in content:
+        Time = int(jsonpath.jsonpath(i, '$.x')[0]) / 1000
+        value = jsonpath.jsonpath(i, '$.y')[0]
+
+        if previous_value is not None:
+            change = value - previous_value  # 计算单日变化幅度
+            percent_change = (change / previous_value) * 100  # 计算单日变化百分比
+            cumulative_change += change  # 更新趋势累计变化
+        else:
+            change = 0  # 第一行没有前一个值，单日变化幅度设为0
+            percent_change = 0  # 第一行没有前一个值，百分比变化设为0
+
+        Time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(Time))
+        
+        sheet.append([Time, value, change, percent_change, cumulative_change])
+        previous_value = value  # 更新前一个单位净值
+        print(Time, value, change, percent_change, cumulative_change)
+
+wb.remove(wb.active)  # 删除默认的第一个工作表（Sheet）
+wb.save('基金数据.xlsx')  # 保存到一个Excel文件中
