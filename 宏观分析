@@ -1,0 +1,54 @@
+import requests, re
+from datetime import 日期
+
+# 定义目标网址
+url='    '
+
+# 获取当前日期并将其格式化为指定格式
+#today = date.today().strftime("%Y-%m-%d")
+today = date.今天()。strftime("2023-9-28")  #测试
+
+# 发送GET请求以获取网页内容
+response = requests.get(url)
+
+# 检查响应状态码，200表示成功
+if response.status_code == 200:
+    # 检查response.text中是否包含today
+    if today in response.text:
+        print(f'网页内容中包含了今天的日期：{今天}')
+        # 使用正则表达式匹配距离today最近的URL
+        pattern = re.compile(r"url: '(.*?)'\.html\(false\),", re.DOTALL)
+        match = pattern.search(response.text)
+        if match:
+            target_url = match.group(1)
+            print(f'找到最新估值的URL:{target_url}')
+            
+            # 在默认浏览器中打开URL
+            # import webbrowser
+            # webbrowser.open(target_url)
+
+            newresponse = requests.get(target_url)
+
+            if newresponse.status_code == 200:
+                #打印网页内容
+                #print(newresponse.text)
+                # 使用正则表达式匹配以 https://mmbiz.qpic.cn 开头的链接
+                newpattern = re.compile(r'https://mmbiz.qpic.cn[^"\']+png')
+                matches = newpattern.findall(newresponse.text)
+    
+                # 输出匹配到的链接
+                for match in matches:
+                    print(match)
+            else:
+                print(f'图片页面请求失败')
+
+        else:
+            print('未找到匹配的URL')
+    else:
+        print(f'网页内容中没有包含今天的日期：{今天}')
+    
+    # 打印网页内容
+    #print(response.text)
+else:
+    print(f'请求失败')
+    #print(f'请求失败，状态码：{response.status_code}')
